@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Mis Finanzas</title>
+
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Finanzas">
+<meta name="theme-color" content="#152238">
+<meta name="format-detection" content="telephone=no">
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --ink:#152238; --ink-soft:#3c4a63; --paper:#f4f6f9; --card:#ffffff; --line:#e2e6ee;
+    --mint:#2dd4a7; --mint-deep:#159a80; --mint-soft:#d9f5ec;
+    --up:#159a80; --up-soft:#d9f5ec;
+    --down:#c1443c; --down-soft:#fbe6e4; --radius:14px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--paper); overscroll-behavior-y:none;}
+  .app{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:var(--ink);
+    max-width:480px; margin:0 auto;
+    padding:calc(12px + env(safe-area-inset-top)) 14px 96px;
+    min-height:100vh; background:var(--paper);
+  }
+  .num{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace; font-variant-numeric:tabular-nums;}
+
+  header.top{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:8px;}
+  header.top h1{font-size:14px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--ink-soft); margin:0;}
+  .icon-btn{
+    width:32px; height:32px; border-radius:9px; border:1px solid var(--line); background:var(--card);
+    display:flex; align-items:center; justify-content:center; font-size:15px; cursor:pointer; flex-shrink:0;
+  }
+  .icon-btn:active{background:var(--line);}
+  .hdr-actions{display:flex; gap:6px;}
+
+  .banner{
+    background:var(--mint-soft); border:1px solid var(--mint-deep); border-radius:12px; padding:10px 12px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; font-size:12.5px; color:#0d6650;
+  }
+  .banner button{
+    background:var(--ink); color:#fff; border:none; padding:8px 12px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; flex-shrink:0;
+  }
+
+  .ticker{background:linear-gradient(135deg, var(--ink) 55%, #0f3d34); color:#fff; border-radius:var(--radius); padding:16px 16px; margin-bottom:14px; position:relative; overflow:hidden;}
+  .ticker::after{content:""; position:absolute; right:-40px; top:-40px; width:130px; height:130px; border-radius:50%; background:radial-gradient(circle, rgba(45,212,167,.32), transparent 70%);}
+  .ticker-row{display:flex; align-items:flex-start; justify-content:space-between;}
+  .ticker .label{font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; opacity:.65; margin-bottom:3px;}
+  .ticker .total{font-size:28px; font-weight:600; letter-spacing:-.01em;}
+  .ticker .sub{font-size:11.5px; opacity:.6; margin-top:4px;}
+  .eye-btn{background:rgba(255,255,255,.12); border:none; width:30px; height:30px; border-radius:8px; color:#fff; font-size:14px; cursor:pointer; flex-shrink:0;}
+
+  .section-title{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-soft); margin:16px 2px 8px; display:flex; justify-content:space-between; align-items:center;}
+
+  .cuentas{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .cuenta-card{
+    background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 12px;
+    display:flex; flex-direction:column; gap:4px; cursor:pointer; position:relative;
+  }
+  .cuenta-card.excluded{opacity:.55;}
+  .cuenta-card .nombre{font-size:12px; font-weight:600; color:var(--ink-soft); display:flex; align-items:center; gap:4px;}
+  .cuenta-card .saldo{font-size:16.5px; font-weight:600;}
+  .cuenta-card .badge{font-size:9px; background:var(--up-soft); color:var(--up); padding:1px 5px; border-radius:5px; font-weight:700;}
+  .cuenta-card.add{align-items:center; justify-content:center; color:var(--mint-deep); border-style:dashed; border-color:var(--mint-soft); font-size:22px; min-height:56px;}
+
+  .mov-list{display:flex; flex-direction:column; gap:7px;}
+  .mov-item{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:10px;}
+  .mov-icon{width:30px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; flex-shrink:0;}
+  .mov-icon.in{background:var(--up-soft); color:var(--up);}
+  .mov-icon.out{background:var(--down-soft); color:var(--down);}
+  .mov-mid{flex:1; min-width:0;}
+  .mov-desc{font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .mov-meta{font-size:11px; color:var(--ink-soft); margin-top:1px;}
+  .mov-amt{font-size:13.5px; font-weight:700; flex-shrink:0;}
+  .mov-amt.in{color:var(--up);} .mov-amt.out{color:var(--down);}
+  .empty{color:var(--ink-soft); font-size:12.5px; text-align:center; padding:20px 10px; border:1px dashed var(--line); border-radius:12px;}
+
+  .fab{
+    position:fixed; left:50%; transform:translateX(-50%); bottom:calc(16px + env(safe-area-inset-bottom));
+    background:var(--mint-deep); color:#fff; border:none; border-radius:999px; padding:14px 24px; font-size:14px; font-weight:700;
+    box-shadow:0 8px 20px rgba(45,212,167,.32); display:flex; align-items:center; gap:8px; cursor:pointer;
+    max-width:440px; width:calc(100% - 28px); justify-content:center;
+  }
+  .fab:active{filter:brightness(.95);}
+
+  .sheet-overlay{position:fixed; inset:0; background:rgba(21,34,56,.45); display:flex; align-items:flex-end; justify-content:center; opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:50;}
+  .sheet-overlay.show{opacity:1; pointer-events:auto;}
+  .sheet{background:var(--paper); width:100%; max-width:480px; border-radius:18px 18px 0 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); transform:translateY(100%); transition:transform .22s ease; max-height:85vh; overflow-y:auto;}
+  .sheet-overlay.show .sheet{transform:translateY(0);}
+  .sheet h2{font-size:15.5px; margin:0 0 14px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin-bottom:5px;}
+  .field input, .field select{width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card); font-size:14.5px; color:var(--ink); font-family:inherit;}
+  .field input.num-input{font-family:ui-monospace,monospace;}
+  .toggle2{display:flex; gap:8px;}
+  .toggle2 button{flex:1; padding:11px; border-radius:10px; border:1px solid var(--line); background:var(--card); font-size:13.5px; font-weight:600; color:var(--ink-soft); cursor:pointer;}
+  .toggle2 button.sel.in{background:var(--up-soft); border-color:var(--up); color:var(--up);}
+  .toggle2 button.sel.out{background:var(--down-soft); border-color:var(--down); color:var(--down);}
+  .sheet-actions{display:flex; gap:9px; margin-top:4px;}
+  .btn{flex:1; padding:12px; border-radius:10px; border:none; font-size:14px; font-weight:700; cursor:pointer;}
+  .btn.primary{background:var(--ink); color:#fff;}
+  .btn.ghost{background:var(--card); color:var(--ink-soft); border:1px solid var(--line);}
+  .btn.danger{background:var(--down-soft); color:var(--down);}
+  .btn:disabled{opacity:.4;}
+
+  .swrow{display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line);}
+  .swrow:last-child{border-bottom:none;}
+  .swrow .swlabel{font-size:13.5px; font-weight:600;}
+  .swtoggle{width:44px; height:26px; border-radius:999px; background:var(--line); position:relative; cursor:pointer; transition:background .15s; flex-shrink:0;}
+  .swtoggle.on{background:var(--up);}
+  .swtoggle .knob{position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:left .15s; box-shadow:0 1px 3px rgba(0,0,0,.25);}
+  .swtoggle.on .knob{left:21px;}
+
+  .toast{position:fixed; top:calc(14px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%) translateY(-140%); z-index:60; background:var(--ink); color:#fff; font-size:12.5px; font-weight:600; padding:9px 16px; border-radius:16px; transition:transform .25s ease; white-space:normal; max-width:88vw; text-align:center; line-height:1.4;}
+  .toast.show{transform:translateX(-50%) translateY(0);}
+
+  .status-line{font-size:11.5px; color:var(--ink-soft); display:flex; align-items:center; gap:6px; margin-bottom:14px;}
+  .dot{width:7px; height:7px; border-radius:50%; background:var(--down); flex-shrink:0;}
+  .dot.on{background:var(--up);}
+  .status-line a{color:var(--ink); font-weight:600; text-decoration:none;}
+  .status-line.err{cursor:pointer; text-decoration:underline;}
+
+  .error-overlay{position:fixed; inset:0; background:rgba(21,34,56,.5); display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:70; padding:20px;}
+  .error-overlay.show{opacity:1; pointer-events:auto;}
+  .error-card{background:var(--card); border-radius:16px; padding:20px; max-width:400px; width:100%; max-height:80vh; overflow-y:auto;}
+  .error-card .etitle{display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:var(--down); margin-bottom:10px;}
+  .error-card .efriendly{font-size:13.5px; line-height:1.5; color:var(--ink); margin-bottom:14px;}
+  .error-card .etech-label{font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin-bottom:5px;}
+  .error-card .etech{font-family:ui-monospace,monospace; font-size:11.5px; background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:9px 10px; color:var(--ink-soft); word-break:break-word; margin-bottom:14px; max-height:110px; overflow-y:auto;}
+  .error-card .eactions{display:flex; gap:8px;}
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header class="top">
+    <h1>Mis Finanzas</h1>
+    <div class="hdr-actions">
+      <button class="icon-btn" id="btnSheetLink" title="Ver hoja" style="display:none;">📄</button>
+      <button class="icon-btn" id="btnSettings" title="Ajustes">⚙️</button>
+    </div>
+  </header>
+
+  <div class="banner" id="banner" style="display:none;">
+    <span>☁️ Conecta Google Drive para respaldar tus movimientos en la nube</span>
+    <button id="btnConnect">Conectar</button>
+  </div>
+
+  <div class="status-line" id="statusLine" style="display:none;">
+    <span class="dot" id="statusDot"></span>
+    <span id="statusText"></span>
+  </div>
+
+  <div class="ticker">
+    <div class="ticker-row">
+      <div>
+        <div class="label">Saldo total disponible</div>
+        <div class="total num" id="totalSaldo">$ 0</div>
+        <div class="sub" id="cuentasCount">Sin cuentas todavía</div>
+      </div>
+      <button class="eye-btn" id="btnEye">👁️</button>
+    </div>
+  </div>
+
+  <div class="section-title">Cuentas</div>
+  <div class="cuentas" id="cuentasGrid"></div>
+
+  <div class="section-title">Movimientos recientes</div>
+  <div class="mov-list" id="movList"></div>
+
+  <button class="fab" id="btnAddMov">＋ Registrar movimiento</button>
+</div>
+
+<!-- Ajustes -->
+<div class="sheet-overlay" id="overlaySettings">
+  <div class="sheet">
+    <h2>Ajustes</h2>
+    <div class="field">
+      <label>Google Client ID (OAuth)</label>
+      <input type="text" id="inClientId" placeholder="xxxxx.apps.googleusercontent.com">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="cancelSettings">Cerrar</button>
+      <button class="btn primary" id="saveSettings">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Agregar cuenta -->
+<div class="sheet-overlay" id="overlayCuenta">
+  <div class="sheet">
+    <h2 id="cuentaTitulo">Agregar cuenta</h2>
+    <div class="field">
+      <label>Nombre de la cuenta</label>
+      <input type="text" id="inCuentaNombre" placeholder="Ej. Nequi, Nu CDT, Efectivo">
+    </div>
+    <div class="field" id="fieldSaldoInicial">
+      <label>Saldo inicial</label>
+      <input type="number" id="inCuentaSaldo" class="num-input" placeholder="0" inputmode="decimal">
+    </div>
+    <div class="swrow">
+      <span class="swlabel">Incluir en el total disponible</span>
+      <div class="swtoggle on" id="swIncluir"><div class="knob"></div></div>
+    </div>
+    <div class="swrow">
+      <span class="swlabel">Tiene rendimiento (interés)</span>
+      <div class="swtoggle" id="swRendimiento"><div class="knob"></div></div>
+    </div>
+    <div class="field" id="fieldEA" style="display:none;">
+      <label>Tasa efectiva anual (E.A. %)</label>
+      <input type="number" id="inEA" class="num-input" placeholder="Ej. 12.5" inputmode="decimal">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="cancelCuenta">Cancelar</button>
+      <button class="btn primary" id="saveCuenta">Guardar cuenta</button>
+    </div>
+    <div class="sheet-actions" id="deleteRow" style="display:none; margin-top:6px;">
+      <button class="btn danger" id="deleteCuenta">Eliminar esta cuenta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Registrar movimiento -->
+<div class="sheet-overlay" id="overlayMov">
+  <div class="sheet">
+    <h2>Registrar movimiento</h2>
+    <div class="field">
+      <label>Tipo</label>
+      <div class="toggle2">
+        <button type="button" id="tipoIngreso" class="sel in">Ingreso</button>
+        <button type="button" id="tipoEgreso">Egreso</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Cuenta</label>
+      <select id="inMovCuenta"></select>
+    </div>
+    <div class="field">
+      <label>Monto</label>
+      <input type="number" id="inMovMonto" class="num-input" placeholder="0" inputmode="decimal">
+    </div>
+    <div class="field">
+      <label>Descripción (opcional)</label>
+      <input type="text" id="inMovDesc" placeholder="Ej. Mercado, pago cliente...">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="cancelMov">Cancelar</button>
+      <button class="btn primary" id="saveMov">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="error-overlay" id="errorOverlay">
+  <div class="error-card">
+    <div class="etitle">⚠️ <span id="errorTitle">No se pudo conectar</span></div>
+    <div class="efriendly" id="errorFriendly"></div>
+    <div class="etech-label">Detalle técnico (para revisar conmigo si sigue fallando)</div>
+    <div class="etech" id="errorTech"></div>
+    <div class="eactions">
+      <button class="btn ghost" id="errorCopy">Copiar detalle</button>
+      <button class="btn primary" id="errorClose">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const STORE_KEY = 'finanzas-data';
+  const SETTINGS_KEY = 'finanzas-settings';
+  const TOKEN_KEY = 'finanzas-google-token';
+
+  let data = { cuentas: [], movimientos: [] };
+  let settings = { clientId: '', sheetId: '', ocultar: false };
+  let tipoSel = 'Ingreso';
+  let editingCuentaId = null;
+  let tokenClient = null;
+
+  const fmt = n => '$ ' + Math.round(n).toLocaleString('es-CO');
+  const todayLabel = () => new Date().toLocaleDateString('es-CO', {day:'2-digit', month:'short'});
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+  function loadAll(){
+    try{ const raw = localStorage.getItem(STORE_KEY); if(raw) data = JSON.parse(raw); }catch(e){}
+    try{ const raw = localStorage.getItem(SETTINGS_KEY); if(raw) settings = Object.assign(settings, JSON.parse(raw)); }catch(e){}
+  }
+  function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(data)); }
+  function saveSettingsLS(){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+
+  // ---------- Cálculo de saldos ----------
+  function saldoCuenta(nombre){
+    const c = data.cuentas.find(c=>c.nombre===nombre);
+    if(!c) return 0;
+    let s = c.saldoBase;
+    data.movimientos.forEach(m=>{
+      if(m.cuenta!==nombre) return;
+      s += m.tipo==='Ingreso' ? m.monto : -m.monto;
+    });
+    return s;
+  }
+
+  function accrueInterest(){
+    const now = Date.now();
+    let changed = false;
+    data.cuentas.forEach(c=>{
+      if(!c.lastAccrual){ c.lastAccrual = new Date(now).toISOString(); changed = true; return; }
+      if(!c.rendimiento) return;
+      const last = new Date(c.lastAccrual).getTime();
+      const days = Math.floor((now-last)/86400000);
+      if(days>=1){
+        const dailyRate = Math.pow(1 + c.rendimiento.ea/100, 1/365) - 1;
+        for(let i=0;i<days;i++){
+          const actual = saldoCuenta(c.nombre);
+          c.saldoBase += actual*dailyRate;
+        }
+        c.lastAccrual = new Date(last + days*86400000).toISOString();
+        changed = true;
+      }
+    });
+    if(changed) save();
+  }
+
+  // ---------- Render ----------
+  function render(){
+    const total = data.cuentas.filter(c=>c.incluirTotal).reduce((a,c)=>a+saldoCuenta(c.nombre),0);
+    document.getElementById('totalSaldo').textContent = settings.ocultar ? '•••••••' : fmt(total);
+    document.getElementById('cuentasCount').textContent =
+      data.cuentas.length ? data.cuentas.length + ' cuenta' + (data.cuentas.length>1?'s':'') + ' · ' + data.cuentas.filter(c=>c.incluirTotal).length + ' en el total' : 'Sin cuentas todavía';
+    document.getElementById('btnEye').textContent = settings.ocultar ? '🙈' : '👁️';
+
+    const grid = document.getElementById('cuentasGrid');
+    grid.innerHTML = '';
+    data.cuentas.forEach(c=>{
+      const s = saldoCuenta(c.nombre);
+      const el = document.createElement('div');
+      el.className = 'cuenta-card' + (c.incluirTotal ? '' : ' excluded');
+      el.innerHTML = `<div class="nombre">${c.nombre} ${c.rendimiento?'<span class="badge">'+c.rendimiento.ea+'% EA</span>':''}</div>
+        <div class="saldo num" style="color:${s<0?'var(--down)':'var(--ink)'}">${settings.ocultar?'••••':fmt(s)}</div>`;
+      el.onclick = ()=>openEditCuenta(c.id);
+      grid.appendChild(el);
+    });
+    const addCard = document.createElement('div');
+    addCard.className = 'cuenta-card add';
+    addCard.textContent = '＋';
+    addCard.onclick = ()=>openNewCuenta();
+    grid.appendChild(addCard);
+
+    const movSelect = document.getElementById('inMovCuenta');
+    movSelect.innerHTML = data.cuentas.map(c=>`<option value="${c.nombre}">${c.nombre}</option>`).join('');
+
+    const list = document.getElementById('movList');
+    const recientes = [...data.movimientos].reverse().slice(0,30);
+    if(!recientes.length){
+      list.innerHTML = '<div class="empty">Todavía no has registrado movimientos.<br>Toca "Registrar movimiento" para empezar.</div>';
+    } else {
+      list.innerHTML = recientes.map(m=>{
+        const cls = m.tipo==='Ingreso' ? 'in':'out';
+        const sign = m.tipo==='Ingreso' ? '+':'−';
+        return `<div class="mov-item">
+          <div class="mov-icon ${cls}">${m.tipo==='Ingreso'?'↑':'↓'}</div>
+          <div class="mov-mid">
+            <div class="mov-desc">${m.descripcion || m.tipo}</div>
+            <div class="mov-meta">${m.cuenta} · ${m.fechaLabel}</div>
+          </div>
+          <div class="mov-amt ${cls} num">${settings.ocultar?'••••':(sign+' '+Math.round(m.monto).toLocaleString('es-CO'))}</div>
+        </div>`;
+      }).join('');
+    }
+
+    document.getElementById('banner').style.display = settings.sheetId ? 'none' : 'flex';
+    document.getElementById('btnSheetLink').style.display = settings.sheetId ? 'flex' : 'none';
+    const statusLine = document.getElementById('statusLine');
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    if(settings.sheetId){
+      statusLine.style.display = 'flex';
+      if(lastError){
+        statusLine.classList.add('err');
+        dot.classList.remove('on');
+        text.textContent = 'No se pudo sincronizar el último cambio · toca para ver por qué';
+        statusLine.onclick = ()=>showError(lastError, 'No se pudo sincronizar');
+      } else {
+        statusLine.classList.remove('err');
+        dot.classList.add('on');
+        text.textContent = 'Sincronizado con Google Sheets';
+        statusLine.onclick = null;
+      }
+    } else {
+      statusLine.style.display = 'none';
+    }
+  }
+
+  function toggleOverlay(id, show){ document.getElementById(id).classList.toggle('show', show); }
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    const dur = msg.length > 40 ? 5000 : 2200;
+    setTimeout(()=>t.classList.remove('show'), dur);
+  }
+
+  // ---------- Errores claros ----------
+  let lastError = null;
+  function friendlyError(raw){
+    const s = (raw||'').toLowerCase();
+    if(s.includes('no-client-id')) return 'Falta pegar tu Client ID de Google en Ajustes ⚙️ antes de conectar.';
+    if(s.includes('access_denied') || s.includes('403') || s.includes('has not completed') || s.includes('verification')) return 'Tu cuenta de Google no está autorizada todavía para usar esta app. Ve a Google Cloud Console > APIs & Services > OAuth consent screen > sección "Test users", y agrega ahí tu correo de Gmail exacto.';
+    if(s.includes('has not been used') || (s.includes('disabled') && s.includes('api'))) return 'La Google Sheets API no está habilitada (o Google todavía no terminó de activarla, puede tardar 2-3 minutos). Ve a APIs & Services > Library > busca "Google Sheets API" > Enable, espera un momento y vuelve a intentar.';
+    if(s.includes('popup') || s.includes('closed') || s.includes('cancel')) return 'Parece que cerraste la ventana de inicio de sesión de Google antes de terminar. Toca Conectar de nuevo y completa todo el proceso hasta el final (incluyendo el botón Continuar/Permitir).';
+    if(s.includes('redirect_uri') || s.includes('origin') || s.includes('idpiframe') || s.includes('unregistered')) return 'El origen de esta página no está autorizado en tu Client ID de Google. Revisa en Google Cloud > Credentials que "Orígenes autorizados de JavaScript" tenga exactamente https://juanplazz1408-netizen.github.io (sin barra ni ruta al final).';
+    if(s.includes('invalid_client') || s.includes('client')) return 'El Client ID pegado en Ajustes no parece válido. Revisa que lo copiaste completo, sin espacios, terminando en .apps.googleusercontent.com.';
+    if(s.includes('failed to fetch') || s.includes('networkerror') || s.includes('load failed')) return 'No se pudo conectar a internet en este momento para hablar con Google. Revisa tu conexión e intenta de nuevo.';
+    return 'Google devolvió un error que no reconozco automáticamente. Copia el detalle técnico de abajo y compártemelo para revisarlo juntos.';
+  }
+  function showError(raw, title){
+    lastError = raw;
+    document.getElementById('errorTitle').textContent = title || 'No se pudo conectar';
+    document.getElementById('errorFriendly').textContent = friendlyError(raw);
+    document.getElementById('errorTech').textContent = (raw && raw.toString) ? raw.toString() : JSON.stringify(raw);
+    toggleOverlay('errorOverlay', true);
+  }
+  document.getElementById('errorClose').onclick = ()=>toggleOverlay('errorOverlay', false);
+  document.getElementById('errorCopy').onclick = async ()=>{
+    try{
+      await navigator.clipboard.writeText(document.getElementById('errorTech').textContent);
+      showToast('Detalle copiado');
+    }catch(e){ showToast('No se pudo copiar, selecciona el texto manualmente'); }
+  };
+
+  // ---------- Ojo ----------
+  document.getElementById('btnEye').onclick = ()=>{
+    settings.ocultar = !settings.ocultar;
+    saveSettingsLS(); render();
+  };
+
+  // ---------- Ajustes ----------
+  document.getElementById('btnSettings').onclick = ()=>{
+    document.getElementById('inClientId').value = settings.clientId || '';
+    toggleOverlay('overlaySettings', true);
+  };
+  document.getElementById('cancelSettings').onclick = ()=>toggleOverlay('overlaySettings', false);
+  document.getElementById('saveSettings').onclick = ()=>{
+    settings.clientId = document.getElementById('inClientId').value.trim();
+    saveSettingsLS();
+    tokenClient = null;
+    toggleOverlay('overlaySettings', false);
+    render();
+    showToast('Ajustes guardados');
+  };
+  document.getElementById('btnSheetLink').onclick = ()=>{
+    if(settings.sheetId) window.open('https://docs.google.com/spreadsheets/d/'+settings.sheetId+'/edit', '_blank');
+  };
+
+  // ---------- Cuentas: crear / editar ----------
+  function resetCuentaForm(){
+    document.getElementById('inCuentaNombre').value = '';
+    document.getElementById('inCuentaSaldo').value = '';
+    document.getElementById('inEA').value = '';
+    setSwitch('swIncluir', true);
+    setSwitch('swRendimiento', false);
+    document.getElementById('fieldEA').style.display = 'none';
+  }
+  function setSwitch(id, on){ document.getElementById(id).classList.toggle('on', on); }
+  function isOn(id){ return document.getElementById(id).classList.contains('on'); }
+
+  document.getElementById('swIncluir').onclick = ()=>setSwitch('swIncluir', !isOn('swIncluir'));
+  document.getElementById('swRendimiento').onclick = ()=>{
+    const on = !isOn('swRendimiento');
+    setSwitch('swRendimiento', on);
+    document.getElementById('fieldEA').style.display = on ? 'block' : 'none';
+  };
+
+  function openNewCuenta(){
+    editingCuentaId = null;
+    document.getElementById('cuentaTitulo').textContent = 'Agregar cuenta';
+    document.getElementById('fieldSaldoInicial').style.display = 'block';
+    document.getElementById('deleteRow').style.display = 'none';
+    resetCuentaForm();
+    toggleOverlay('overlayCuenta', true);
+  }
+  function openEditCuenta(id){
+    const c = data.cuentas.find(c=>c.id===id);
+    if(!c) return;
+    editingCuentaId = id;
+    document.getElementById('cuentaTitulo').textContent = 'Editar cuenta';
+    document.getElementById('fieldSaldoInicial').style.display = 'none';
+    document.getElementById('deleteRow').style.display = 'flex';
+    document.getElementById('inCuentaNombre').value = c.nombre;
+    setSwitch('swIncluir', c.incluirTotal);
+    setSwitch('swRendimiento', !!c.rendimiento);
+    document.getElementById('fieldEA').style.display = c.rendimiento ? 'block' : 'none';
+    document.getElementById('inEA').value = c.rendimiento ? c.rendimiento.ea : '';
+    toggleOverlay('overlayCuenta', true);
+  }
+  document.getElementById('cancelCuenta').onclick = ()=>toggleOverlay('overlayCuenta', false);
+
+  document.getElementById('saveCuenta').onclick = ()=>{
+    const nombre = document.getElementById('inCuentaNombre').value.trim();
+    if(!nombre){ showToast('Escribe un nombre de cuenta'); return; }
+    const incluirTotal = isOn('swIncluir');
+    const tieneRend = isOn('swRendimiento');
+    const ea = parseFloat(document.getElementById('inEA').value || '0');
+
+    if(editingCuentaId){
+      const c = data.cuentas.find(c=>c.id===editingCuentaId);
+      if(data.cuentas.some(o=>o.id!==editingCuentaId && o.nombre.toLowerCase()===nombre.toLowerCase())){ showToast('Ya existe otra cuenta con ese nombre'); return; }
+      const oldNombre = c.nombre;
+      c.nombre = nombre;
+      c.incluirTotal = incluirTotal;
+      c.rendimiento = tieneRend ? {ea: ea} : null;
+      if(oldNombre !== nombre){ data.movimientos.forEach(m=>{ if(m.cuenta===oldNombre) m.cuenta = nombre; }); }
+    } else {
+      if(data.cuentas.some(c=>c.nombre.toLowerCase()===nombre.toLowerCase())){ showToast('Esa cuenta ya existe'); return; }
+      const saldo = parseFloat(document.getElementById('inCuentaSaldo').value || '0');
+      data.cuentas.push({
+        id: uid(), nombre, saldoBase: saldo, incluirTotal,
+        rendimiento: tieneRend ? {ea: ea} : null,
+        lastAccrual: new Date().toISOString()
+      });
+    }
+    save();
+    toggleOverlay('overlayCuenta', false);
+    render();
+    syncSaldosBackground();
+    showToast('Cuenta guardada');
+  };
+
+  document.getElementById('deleteCuenta').onclick = ()=>{
+    if(!editingCuentaId) return;
+    const c = data.cuentas.find(c=>c.id===editingCuentaId);
+    if(!c) return;
+    data.cuentas = data.cuentas.filter(c=>c.id!==editingCuentaId);
+    data.movimientos = data.movimientos.filter(m=>m.cuenta!==c.nombre);
+    save();
+    toggleOverlay('overlayCuenta', false);
+    render();
+    syncSaldosBackground();
+    showToast('Cuenta eliminada');
+  };
+
+  // ---------- Movimientos ----------
+  document.getElementById('btnAddMov').onclick = ()=>{
+    if(!data.cuentas.length){ showToast('Primero agrega una cuenta'); return; }
+    toggleOverlay('overlayMov', true);
+  };
+  document.getElementById('cancelMov').onclick = ()=>toggleOverlay('overlayMov', false);
+  document.getElementById('tipoIngreso').onclick = ()=>{
+    tipoSel='Ingreso';
+    document.getElementById('tipoIngreso').classList.add('sel','in');
+    document.getElementById('tipoEgreso').classList.remove('sel','out');
+  };
+  document.getElementById('tipoEgreso').onclick = ()=>{
+    tipoSel='Egreso';
+    document.getElementById('tipoEgreso').classList.add('sel','out');
+    document.getElementById('tipoIngreso').classList.remove('sel','in');
+  };
+
+  function registrarMovimiento(tipo, cuenta, monto, descripcion){
+    const now = new Date();
+    const m = { id: uid(), tipo, cuenta, monto, descripcion: descripcion||'', fecha: now.toISOString(), fechaLabel: todayLabel() };
+    data.movimientos.push(m);
+    save();
+    render();
+    syncMovimientoBackground(m);
+    return m;
+  }
+
+  document.getElementById('saveMov').onclick = ()=>{
+    const cuenta = document.getElementById('inMovCuenta').value;
+    const monto = parseFloat(document.getElementById('inMovMonto').value || '0');
+    const descripcion = document.getElementById('inMovDesc').value.trim();
+    if(!cuenta){ showToast('Selecciona una cuenta'); return; }
+    if(!monto || monto<=0){ showToast('Escribe un monto válido'); return; }
+    registrarMovimiento(tipoSel, cuenta, monto, descripcion);
+    document.getElementById('inMovMonto').value=''; document.getElementById('inMovDesc').value='';
+    toggleOverlay('overlayMov', false);
+    showToast('Movimiento guardado');
+  };
+
+  // ---------- Google Sheets ----------
+  function getTokenClient(){
+    if(!settings.clientId || typeof google === 'undefined') return null;
+    if(!tokenClient){
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: settings.clientId,
+        scope: 'https://www.googleapis.com/auth/spreadsheets',
+        callback: ()=>{}
+      });
+    }
+    return tokenClient;
+  }
+
+  function getToken(interactive){
+    return new Promise((resolve,reject)=>{
+      const cached = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
+      if(cached && cached.expires_at > Date.now()+60000){ resolve(cached.access_token); return; }
+      const tc = getTokenClient();
+      if(!tc){ reject('no-client-id'); return; }
+      tc.callback = (resp)=>{
+        if(resp.error){ reject(resp.error); return; }
+        const expires_at = Date.now() + (resp.expires_in*1000);
+        localStorage.setItem(TOKEN_KEY, JSON.stringify({access_token: resp.access_token, expires_at}));
+        resolve(resp.access_token);
+      };
+      tc.requestAccessToken({ prompt: interactive ? 'consent' : '' });
+    });
+  }
+
+  async function ensureSheet(token){
+    if(settings.sheetId) return settings.sheetId;
+    const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+      method:'POST',
+      headers:{'Authorization':'Bearer '+token, 'Content-Type':'application/json'},
+      body: JSON.stringify({
+        properties: {title:'Mis Finanzas'},
+        sheets: [{properties:{title:'Movimientos'}}, {properties:{title:'Saldos'}}]
+      })
+    });
+    const j = await res.json();
+    if(!res.ok || !j.spreadsheetId){
+      const msg = (j.error && j.error.message) ? j.error.message : ('HTTP '+res.status);
+      throw new Error(msg);
+    }
+    settings.sheetId = j.spreadsheetId;
+    saveSettingsLS();
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${settings.sheetId}/values/Movimientos!A1:E1?valueInputOption=RAW`, {
+      method:'PUT', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body: JSON.stringify({values:[['Fecha','Tipo','Cantidad','Cuenta','Descripción']]})
+    });
+    return settings.sheetId;
+  }
+
+  async function syncSaldos(token, sheetId){
+    const rows = [['Cuenta','Saldo actual']];
+    data.cuentas.forEach(c=> rows.push([c.nombre, Math.round(saldoCuenta(c.nombre))]));
+    const total = data.cuentas.filter(c=>c.incluirTotal).reduce((a,c)=>a+saldoCuenta(c.nombre),0);
+    rows.push(['Total disponible', Math.round(total)]);
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Saldos!A1:B${rows.length}?valueInputOption=RAW`, {
+      method:'PUT', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body: JSON.stringify({values: rows})
+    });
+  }
+
+  async function syncMovimientoBackground(m){
+    try{
+      const token = await getToken(false);
+      const sheetId = await ensureSheet(token);
+      const fecha = new Date(m.fecha).toLocaleDateString('es-CO');
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Movimientos!A:E:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+        method:'POST', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body: JSON.stringify({values:[[fecha, m.tipo, m.monto, m.cuenta, m.descripcion||'']]})
+      });
+      await syncSaldos(token, sheetId);
+      lastError = null;
+      render();
+    }catch(e){
+      lastError = (e && e.message) ? e.message : (typeof e==='string' ? e : JSON.stringify(e));
+      render();
+    }
+  }
+
+  async function syncSaldosBackground(){
+    try{
+      const token = await getToken(false);
+      const sheetId = await ensureSheet(token);
+      await syncSaldos(token, sheetId);
+      lastError = null;
+      render();
+    }catch(e){
+      lastError = (e && e.message) ? e.message : (typeof e==='string' ? e : JSON.stringify(e));
+      render();
+    }
+  }
+
+  document.getElementById('btnConnect').onclick = async ()=>{
+    if(!settings.clientId){
+      showToast('Primero pega tu Client ID en Ajustes ⚙️');
+      document.getElementById('btnSettings').click();
+      return;
+    }
+    try{
+      showToast('Conectando con Google...');
+      const token = await getToken(true);
+      await ensureSheet(token);
+      await syncSaldos(token, settings.sheetId);
+      lastError = null;
+      render();
+      showToast('Conectado y sincronizado ✅');
+    }catch(e){
+      const detalle = (e && e.message) ? e.message : (typeof e==='string' ? e : JSON.stringify(e));
+      showError(detalle, 'No se pudo conectar con Google');
+      render();
+    }
+  };
+
+  // ---------- Quick add por URL (Atajos) ----------
+  function processQuickAdd(){
+    const p = new URLSearchParams(window.location.search);
+    if(!p.has('quickadd')) return;
+    const tipo = p.get('tipo') === 'Egreso' ? 'Egreso' : 'Ingreso';
+    const cuenta = p.get('cuenta') || '';
+    const monto = parseFloat(p.get('monto') || '0');
+    const desc = p.get('desc') || '';
+    history.replaceState({}, '', window.location.pathname);
+    if(!cuenta || !monto || monto<=0 || !data.cuentas.some(c=>c.nombre===cuenta)){
+      showToast('No se pudo registrar: revisa cuenta/monto del Atajo');
+      return;
+    }
+    registrarMovimiento(tipo, cuenta, monto, desc);
+    showToast('Movimiento agregado desde el Atajo ✅');
+  }
+
+  // ---------- Init ----------
+  loadAll();
+  accrueInterest();
+  render();
+  processQuickAdd();
+})();
+</script>
+</body>
+</html>
