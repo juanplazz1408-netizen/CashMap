@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Mis Finanzas</title>
+
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Finanzas">
+<meta name="theme-color" content="#152238">
+<meta name="format-detection" content="telephone=no">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#152238;
+    --ink-soft:#3c4a63;
+    --paper:#f4f6f9;
+    --card:#ffffff;
+    --line:#e2e6ee;
+    --gold:#c8962c;
+    --gold-soft:#f2e3c2;
+    --up:#1f8a5f;
+    --up-soft:#e2f3ea;
+    --down:#c1443c;
+    --down-soft:#fbe6e4;
+    --radius:16px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--paper); overscroll-behavior-y:none;}
+  .app{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    color:var(--ink);
+    max-width:480px;
+    margin:0 auto;
+    padding:calc(18px + env(safe-area-inset-top)) 16px 100px;
+    min-height:100vh;
+    background:var(--paper);
+  }
+  .num{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace; font-variant-numeric:tabular-nums;}
+
+  header.top{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px;}
+  header.top h1{font-size:15px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-soft); margin:0;}
+  .export-btn{
+    border:1px solid var(--line); background:var(--card); color:var(--ink-soft);
+    font-size:12px; font-weight:600; padding:7px 12px; border-radius:999px; cursor:pointer;
+  }
+  .export-btn:active{background:var(--line);}
+
+  .ticker{
+    background:var(--ink); color:#fff; border-radius:var(--radius);
+    padding:20px 18px; margin-bottom:18px; position:relative; overflow:hidden;
+  }
+  .ticker::after{
+    content:""; position:absolute; right:-40px; top:-40px; width:140px; height:140px;
+    border-radius:50%; background:radial-gradient(circle, rgba(200,150,44,.35), transparent 70%);
+  }
+  .ticker .label{font-size:11px; letter-spacing:.12em; text-transform:uppercase; opacity:.65; margin-bottom:4px;}
+  .ticker .total{font-size:34px; font-weight:600; letter-spacing:-.01em;}
+  .ticker .sub{font-size:12px; opacity:.6; margin-top:6px;}
+
+  .section-title{font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); margin:22px 2px 10px;}
+
+  .cuentas{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .cuenta-card{
+    background:var(--card); border:1px solid var(--line); border-radius:14px; padding:13px 14px;
+    display:flex; flex-direction:column; gap:6px; cursor:pointer;
+  }
+  .cuenta-card .nombre{font-size:12.5px; font-weight:600; color:var(--ink-soft);}
+  .cuenta-card .saldo{font-size:18px; font-weight:600;}
+  .cuenta-card.add{
+    align-items:center; justify-content:center; color:var(--gold); border-style:dashed; border-color:var(--gold-soft);
+    font-size:26px; font-weight:400; min-height:64px;
+  }
+
+  .mov-list{display:flex; flex-direction:column; gap:8px;}
+  .mov-item{
+    background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+    display:flex; align-items:center; gap:12px;
+  }
+  .mov-icon{
+    width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    font-size:15px; font-weight:700; flex-shrink:0;
+  }
+  .mov-icon.in{background:var(--up-soft); color:var(--up);}
+  .mov-icon.out{background:var(--down-soft); color:var(--down);}
+  .mov-mid{flex:1; min-width:0;}
+  .mov-desc{font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .mov-meta{font-size:11.5px; color:var(--ink-soft); margin-top:1px;}
+  .mov-amt{font-size:14.5px; font-weight:700; flex-shrink:0;}
+  .mov-amt.in{color:var(--up);}
+  .mov-amt.out{color:var(--down);}
+  .empty{color:var(--ink-soft); font-size:13px; text-align:center; padding:26px 10px; border:1px dashed var(--line); border-radius:14px;}
+
+  .fab{
+    position:fixed; left:50%; transform:translateX(-50%); bottom:calc(22px + env(safe-area-inset-bottom));
+    background:var(--gold); color:#fff; border:none; border-radius:999px;
+    padding:15px 26px; font-size:14.5px; font-weight:700; box-shadow:0 8px 20px rgba(200,150,44,.35);
+    display:flex; align-items:center; gap:8px; cursor:pointer; max-width:440px; width:calc(100% - 32px); justify-content:center;
+  }
+  .fab:active{filter:brightness(.95);}
+
+  .sheet-overlay{
+    position:fixed; inset:0; background:rgba(21,34,56,.45); display:flex; align-items:flex-end; justify-content:center;
+    opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:50;
+  }
+  .sheet-overlay.show{opacity:1; pointer-events:auto;}
+  .sheet{
+    background:var(--paper); width:100%; max-width:480px; border-radius:20px 20px 0 0;
+    padding:20px 18px calc(20px + env(safe-area-inset-bottom));
+    transform:translateY(100%); transition:transform .22s ease; max-height:85vh; overflow-y:auto;
+  }
+  .sheet-overlay.show .sheet{transform:translateY(0);}
+  .sheet h2{font-size:16px; margin:0 0 16px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin-bottom:6px;}
+  .field input, .field select{
+    width:100%; padding:12px 13px; border-radius:11px; border:1px solid var(--line); background:var(--card);
+    font-size:15px; color:var(--ink); font-family:inherit;
+  }
+  .field input.num-input{font-family:ui-monospace,monospace;}
+  .toggle2{display:flex; gap:8px;}
+  .toggle2 button{
+    flex:1; padding:12px; border-radius:11px; border:1px solid var(--line); background:var(--card);
+    font-size:14px; font-weight:600; color:var(--ink-soft); cursor:pointer;
+  }
+  .toggle2 button.sel.in{background:var(--up-soft); border-color:var(--up); color:var(--up);}
+  .toggle2 button.sel.out{background:var(--down-soft); border-color:var(--down); color:var(--down);}
+  .sheet-actions{display:flex; gap:10px; margin-top:6px;}
+  .btn{flex:1; padding:13px; border-radius:11px; border:none; font-size:14.5px; font-weight:700; cursor:pointer;}
+  .btn.primary{background:var(--ink); color:#fff;}
+  .btn.ghost{background:var(--card); color:var(--ink-soft); border:1px solid var(--line);}
+  .btn:disabled{opacity:.4;}
+
+  .toast{
+    position:fixed; top:calc(16px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%) translateY(-140%); z-index:60;
+    background:var(--ink); color:#fff; font-size:13px; font-weight:600; padding:10px 18px; border-radius:999px;
+    transition:transform .25s ease; white-space:nowrap;
+  }
+  .toast.show{transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header class="top">
+    <h1>Mis Finanzas</h1>
+    <button class="export-btn" id="btnExport">Exportar Excel</button>
+  </header>
+
+  <div class="ticker">
+    <div class="label">Saldo total disponible</div>
+    <div class="total num" id="totalSaldo">$ 0</div>
+    <div class="sub" id="cuentasCount">Sin cuentas todavía</div>
+  </div>
+
+  <div class="section-title">Cuentas</div>
+  <div class="cuentas" id="cuentasGrid"></div>
+
+  <div class="section-title">Movimientos recientes</div>
+  <div class="mov-list" id="movList"></div>
+
+  <button class="fab" id="btnAddMov">＋ Registrar movimiento</button>
+</div>
+
+<div class="sheet-overlay" id="overlayCuenta">
+  <div class="sheet">
+    <h2>Agregar cuenta</h2>
+    <div class="field">
+      <label>Nombre de la cuenta</label>
+      <input type="text" id="inCuentaNombre" placeholder="Ej. Nequi, Nu CDT, Efectivo">
+    </div>
+    <div class="field">
+      <label>Saldo inicial</label>
+      <input type="number" id="inCuentaSaldo" class="num-input" placeholder="0" inputmode="decimal">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="cancelCuenta">Cancelar</button>
+      <button class="btn primary" id="saveCuenta">Guardar cuenta</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="overlayMov">
+  <div class="sheet">
+    <h2>Registrar movimiento</h2>
+    <div class="field">
+      <label>Tipo</label>
+      <div class="toggle2">
+        <button type="button" id="tipoIngreso" class="sel in">Ingreso</button>
+        <button type="button" id="tipoEgreso">Egreso</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Cuenta</label>
+      <select id="inMovCuenta"></select>
+    </div>
+    <div class="field">
+      <label>Monto</label>
+      <input type="number" id="inMovMonto" class="num-input" placeholder="0" inputmode="decimal">
+    </div>
+    <div class="field">
+      <label>Descripción (opcional)</label>
+      <input type="text" id="inMovDesc" placeholder="Ej. Mercado, pago cliente...">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="cancelMov">Cancelar</button>
+      <button class="btn primary" id="saveMov">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const STORE_KEY = 'finanzas-data';
+  let data = { cuentas: [], movimientos: [] };
+  let tipoSel = 'Ingreso';
+
+  const fmt = n => '$ ' + Math.round(n).toLocaleString('es-CO');
+  const todayStr = () => {
+    const d = new Date();
+    return d.toLocaleDateString('es-CO', {day:'2-digit', month:'short'});
+  };
+
+  // Persistencia local: este archivo corre fuera de Claude, así que usa
+  // localStorage del navegador (queda guardado en el propio iPhone).
+  function load(){
+    try{
+      const raw = localStorage.getItem(STORE_KEY);
+      if(raw) data = JSON.parse(raw);
+    }catch(e){ /* no existe todavía */ }
+    render();
+  }
+  function save(){
+    try{
+      localStorage.setItem(STORE_KEY, JSON.stringify(data));
+    }catch(e){ showToast('No se pudo guardar, intenta de nuevo'); }
+  }
+
+  function saldoCuenta(nombre){
+    const c = data.cuentas.find(c=>c.nombre===nombre);
+    if(!c) return 0;
+    let s = c.saldoInicial;
+    data.movimientos.forEach(m=>{
+      if(m.cuenta!==nombre) return;
+      s += m.tipo==='Ingreso' ? m.monto : -m.monto;
+    });
+    return s;
+  }
+
+  function render(){
+    const total = data.cuentas.reduce((acc,c)=>acc+saldoCuenta(c.nombre),0);
+    document.getElementById('totalSaldo').textContent = fmt(total);
+    document.getElementById('cuentasCount').textContent =
+      data.cuentas.length ? data.cuentas.length + ' cuenta' + (data.cuentas.length>1?'s':'') + ' activas' : 'Sin cuentas todavía';
+
+    const grid = document.getElementById('cuentasGrid');
+    grid.innerHTML = '';
+    data.cuentas.forEach(c=>{
+      const s = saldoCuenta(c.nombre);
+      const el = document.createElement('div');
+      el.className = 'cuenta-card';
+      el.innerHTML = `<div class="nombre">${c.nombre}</div><div class="saldo num" style="color:${s<0?'var(--down)':'var(--ink)'}">${fmt(s)}</div>`;
+      grid.appendChild(el);
+    });
+    const addCard = document.createElement('div');
+    addCard.className = 'cuenta-card add';
+    addCard.textContent = '＋';
+    addCard.onclick = ()=>toggleOverlay('overlayCuenta', true);
+    grid.appendChild(addCard);
+
+    const movSelect = document.getElementById('inMovCuenta');
+    movSelect.innerHTML = data.cuentas.map(c=>`<option value="${c.nombre}">${c.nombre}</option>`).join('');
+
+    const list = document.getElementById('movList');
+    const recientes = [...data.movimientos].reverse().slice(0,30);
+    if(!recientes.length){
+      list.innerHTML = '<div class="empty">Todavía no has registrado movimientos.<br>Toca "Registrar movimiento" para empezar.</div>';
+    } else {
+      list.innerHTML = recientes.map(m=>{
+        const cls = m.tipo==='Ingreso' ? 'in':'out';
+        const sign = m.tipo==='Ingreso' ? '+':'−';
+        return `<div class="mov-item">
+          <div class="mov-icon ${cls}">${m.tipo==='Ingreso'?'↑':'↓'}</div>
+          <div class="mov-mid">
+            <div class="mov-desc">${m.descripcion || m.tipo}</div>
+            <div class="mov-meta">${m.cuenta} · ${m.fechaLabel}</div>
+          </div>
+          <div class="mov-amt ${cls} num">${sign} ${Math.round(m.monto).toLocaleString('es-CO')}</div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  function toggleOverlay(id, show){
+    document.getElementById(id).classList.toggle('show', show);
+  }
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 1800);
+  }
+
+  document.getElementById('cancelCuenta').onclick = ()=>toggleOverlay('overlayCuenta', false);
+  document.getElementById('saveCuenta').onclick = ()=>{
+    const nombre = document.getElementById('inCuentaNombre').value.trim();
+    const saldo = parseFloat(document.getElementById('inCuentaSaldo').value || '0');
+    if(!nombre){ showToast('Escribe un nombre de cuenta'); return; }
+    if(data.cuentas.some(c=>c.nombre.toLowerCase()===nombre.toLowerCase())){ showToast('Esa cuenta ya existe'); return; }
+    data.cuentas.push({nombre, saldoInicial: saldo});
+    save();
+    document.getElementById('inCuentaNombre').value='';
+    document.getElementById('inCuentaSaldo').value='';
+    toggleOverlay('overlayCuenta', false);
+    render();
+    showToast('Cuenta agregada');
+  };
+
+  document.getElementById('btnAddMov').onclick = ()=>{
+    if(!data.cuentas.length){ showToast('Primero agrega una cuenta'); return; }
+    toggleOverlay('overlayMov', true);
+  };
+  document.getElementById('cancelMov').onclick = ()=>toggleOverlay('overlayMov', false);
+  document.getElementById('tipoIngreso').onclick = ()=>{
+    tipoSel='Ingreso';
+    document.getElementById('tipoIngreso').classList.add('sel','in');
+    document.getElementById('tipoEgreso').classList.remove('sel','out');
+  };
+  document.getElementById('tipoEgreso').onclick = ()=>{
+    tipoSel='Egreso';
+    document.getElementById('tipoEgreso').classList.add('sel','out');
+    document.getElementById('tipoIngreso').classList.remove('sel','in');
+  };
+  document.getElementById('saveMov').onclick = ()=>{
+    const cuenta = document.getElementById('inMovCuenta').value;
+    const monto = parseFloat(document.getElementById('inMovMonto').value || '0');
+    const descripcion = document.getElementById('inMovDesc').value.trim();
+    if(!cuenta){ showToast('Selecciona una cuenta'); return; }
+    if(!monto || monto<=0){ showToast('Escribe un monto válido'); return; }
+    const now = new Date();
+    data.movimientos.push({
+      tipo: tipoSel, cuenta, monto, descripcion,
+      fecha: now.toISOString(), fechaLabel: todayStr()
+    });
+    save();
+    document.getElementById('inMovMonto').value='';
+    document.getElementById('inMovDesc').value='';
+    toggleOverlay('overlayMov', false);
+    render();
+    showToast('Movimiento guardado');
+  };
+
+  document.getElementById('btnExport').onclick = ()=>{
+    if(typeof XLSX === 'undefined'){ showToast('Cargando Excel, intenta de nuevo en un momento'); return; }
+    const movRows = [['Fecha','Tipo','Cantidad','Cuenta','Descripción']];
+    data.movimientos.forEach(m=>{
+      const d = new Date(m.fecha);
+      movRows.push([d.toLocaleDateString('es-CO'), m.tipo, m.monto, m.cuenta, m.descripcion || '']);
+    });
+    const saldoRows = [['Cuenta','Saldo actual']];
+    data.cuentas.forEach(c=> saldoRows.push([c.nombre, saldoCuenta(c.nombre)]));
+    saldoRows.push(['Total', data.cuentas.reduce((a,c)=>a+saldoCuenta(c.nombre),0)]);
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(movRows), 'Movimientos');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(saldoRows), 'Saldos');
+    XLSX.writeFile(wb, 'Finanzas.xlsx');
+  };
+
+  load();
+})();
+</script>
+</body>
+</html>
